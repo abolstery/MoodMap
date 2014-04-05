@@ -1,26 +1,44 @@
 from textblob import TextBlob
 import tweepy
 import json
-import sys
+import re
+
+def filter(tweet_dict):
+		try:
+			text = tweet_dict['text']
+		except KeyError:
+			return None
+
+		#No urls
+		if re.search("http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+", text):
+			return None
+
+		#Only feel words
+		if not re.search("(i feel)|(i am feeling)|(i'm feeling)|(i dont feel)|(I'm)|(Im)|(I am)|(makes me)", text):
+			return None
+
+		return text
 
 class MoodMapStreamer(tweepy.StreamListener):
 	def __init__(self):
-		self.avg_polarity = 0
 		self.count = 0
 
 	def on_data(self, data):
 		decoded = json.loads(data)
-		try:
-			text = decoded['text'].encode('ascii', 'ignore')
-		except KeyError:
-			return True
-		curr = TextBlob(text)
 
-		if curr.polarity != 0:
-			print '%s --> %f' % (text, curr.polarity)
+		#text = filter(decoded)
+
+		try:
+			text = decoded['text']
+		except KeyError:
+			return None
+
+		if text:
+			p_text = TextBlob(text)
+
 			self.count += 1
-			self.avg_polarity = (self.avg_polarity*(self.count - 1) + curr.polarity) / self.count
-			print 'N: %d, Average Polarity: %f' % (self.count, self.avg_polarity)
+
+			print "%s (n = %d, polarity = %f)" % (text, self.count, p_text.polarity)
 
 		return True
 
@@ -28,16 +46,14 @@ class MoodMapStreamer(tweepy.StreamListener):
 		print status
 
 
-consumer_key = '' #api key
-consumer_secret = '' #api secret
-access_token = '' #access token
-access_token_secret = '' #access token secret
+consumer_key = ''
+consumer_secret = ''
+access_token = ''
+access_token_secret = ''
 
 auth = tweepy.auth.OAuthHandler(consumer_key, consumer_secret)
 auth.set_access_token(access_token, access_token_secret)
 
-locations = [[-122.75,36.8,-121.75,37.8], [-74,40,-73,41], [-122.75,36.8,-121.75,37.8,-74,40,-73,41], [-180,-90,180,90]]
-
 stream = tweepy.Stream(auth, MoodMapStreamer(), timeout=None)
 
-stream.filter(locations = locations[int(sys.argv[1])])
+stream.filter(locations = [-180, -90, 180, 90])
